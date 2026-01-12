@@ -19,14 +19,15 @@ export class SourcingEngine {
         rateShopper: RateShopper,
         retentionCalculator: RetentionCostCalculator,
         candidateSelector: CandidateSelector,
-        config: SourcingConfig
+        config: SourcingConfig,
+        capacityService?: CapacityService
     ) {
         this.locations = locations;
         this.inventoryProvider = inventoryProvider;
         this.rateShopper = rateShopper;
         this.retentionCalculator = retentionCalculator;
         this.candidateSelector = candidateSelector;
-        this.capacityService = new CapacityService();
+        this.capacityService = capacityService || new CapacityService();
         this.config = config;
     }
 
