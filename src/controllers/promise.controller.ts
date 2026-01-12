@@ -1,32 +1,6 @@
 import { Request, Response } from 'express';
-import { SourcingEngine } from '../sourcing/engine';
+import { ServiceContainer } from '../container';
 import { Order } from '../types';
-import { config } from '../config';
-import { DefaultInventoryProvider, DefaultRateShopper } from '../services/providers';
-import { CarrierService } from '../services/carrier-service';
-import { CandidateSelector } from '../sourcing/candidate-selector';
-import { mockLocations, mockCarriers } from '../mocks/data';
-
-// Initialize Services (Singleton-ish for this simple app)
-// In a real app, these would be injected via DI container.
-const carrierService = new CarrierService();
-const inventoryProvider = new DefaultInventoryProvider(mockLocations);
-const rateShopper = new DefaultRateShopper(carrierService, mockCarriers);
-const candidateSelector = new CandidateSelector();
-
-const engine = new SourcingEngine(
-    mockLocations,
-    inventoryProvider,
-    rateShopper,
-    { calculateRetentionCost: async () => 10.0 }, // Mock Retention
-    candidateSelector,
-    // Use config values
-    {
-        strategy: config.sourcing.strategy as any,
-        slaStrictness: config.sourcing.slaStrictness as any,
-        maxSearchRadiusMiles: config.sourcing.maxSearchRadiusMiles
-    }
-);
 
 export class PromiseController {
     static async promiseOrder(req: Request, res: Response): Promise<void> {
@@ -41,6 +15,7 @@ export class PromiseController {
                 return;
             }
 
+            const engine = ServiceContainer.getInstance().getSourcingEngine();
             const response = await engine.calculatePromise(order);
 
             if (response) {
