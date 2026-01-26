@@ -1,23 +1,17 @@
-# Build Stage
+# Stage 1: Build
 FROM node:18-alpine AS builder
-
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
-COPY . .
-RUN npm run build 2>/dev/null || echo "No build script, using ts-node"
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
 
-# Production Stage
+# Stage 2: Production
 FROM node:18-alpine
-
 WORKDIR /app
 COPY package*.json ./
 RUN npm install --production
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./
-
-# Expose port
-EXPOSE 3000
-
-# Start command
-CMD ["npx", "ts-node", "src/server.ts"]
+COPY --from=builder /app/dist ./dist
+EXPOSE 4000
+CMD ["node", "dist/server.js"]

@@ -62,8 +62,8 @@ export class SourcingEngine {
             if (capacity <= 0) continue;
 
             // b. Check Inventory (Async via Provider)
-            const hasInventory = await this.hasSufficientInventory(loc, order.items);
-            if (!hasInventory) continue;
+            const availability = await this.checkAvailability(loc, order.items);
+            if (!availability.sufficient) continue;
 
             // c. Calculate Logistics (Async via Shopper)
             // Shopper returns best rate for this origin-dest pair
@@ -72,7 +72,13 @@ export class SourcingEngine {
 
                 // Calculate Dates
                 const carrierService = new CarrierService(); // Used for date utils
-                const pickupDate = carrierService.calculatePickupDate(order.orderDate, rate.carrier);
+
+                // Base Date: Max(OrderDate, AvailabilityDate)
+                const baseDate = (availability.availableDate && availability.availableDate > order.orderDate)
+                    ? availability.availableDate
+                    : order.orderDate;
+
+                const pickupDate = carrierService.calculatePickupDate(baseDate, rate.carrier);
 
                 // Apply Dynamic SLA (Prep Time)
                 const maxPrepTime = Math.max(...order.items.map(i => i.prepTimeHours || 0));
@@ -211,20 +217,61 @@ export class SourcingEngine {
         return bestCandidate;
     }
 
-    private async hasSufficientInventory(loc: Location, items: Item[]): Promise<boolean> {
+    private async checkAvailability(loc: Location, items: Item[]): Promise<{ sufficient: boolean; availableDate?: Date }> {
         const inventory = await this.inventoryProvider.getInventory(loc.locationId, items.map(i => i.sku));
+        let maxStartDate = new Date(0); // Epoch
 
         for (const item of items) {
             const invRecord = inventory.find(inv => inv.sku === item.sku);
-            if (!invRecord) return false;
+            if (!invRecord) return { sufficient: false };
 
-            // Dynamic Safety Stock
+            // 1. Check Total ATP
+            // Use ATP from UIS if available, otherwise fallback to local calculation
+            const atp = invRecord.atp !== undefined
+                ? invRecord.atp
+                : (invRecord.qty - this.capacityService.getDynamicSafetyStock(loc, invRecord.safetyStock));
+
+            if (atp < item.qty) return { sufficient: false };
+
+            // 2. Determine Availability Date
+            // Calculate Net OnHand
             const safetyStock = this.capacityService.getDynamicSafetyStock(loc, invRecord.safetyStock);
+            const reserved = invRecord.reservedQty || 0;
+            const onHandNet = Math.max(0, invRecord.qty - safetyStock - reserved);
 
-            const available = invRecord.qty - safetyStock;
-            if (available < item.qty) return false;
+            if (onHandNet >= item.qty) {
+                // Fully covered by OnHand
+                // Date remains unchanged (Now)
+            } else {
+                // Needs Future Inventory
+                const deficit = item.qty - onHandNet;
+
+                if (!invRecord.futureDetails || invRecord.futureDetails.length === 0) {
+                    // ATP says yes, but no future details? Mismatch. Fail safe.
+                    return { sufficient: false };
+                }
+
+                // Sort ASNs by ETA
+                const sortedASNs = [...invRecord.futureDetails].sort((a, b) => new Date(a.eta).getTime() - new Date(b.eta).getTime());
+
+                let covered = 0;
+                let neededDate = new Date();
+
+                for (const asn of sortedASNs) {
+                    covered += asn.qty;
+                    neededDate = new Date(asn.eta);
+                    if (covered >= deficit) break;
+                }
+
+                if (covered < deficit) return { sufficient: false }; // Should be caught by ATP check but double check
+
+                if (neededDate > maxStartDate) {
+                    maxStartDate = neededDate;
+                }
+            }
         }
-        return true;
+
+        return { sufficient: true, availableDate: maxStartDate };
     }
 
     private async getFulfillableItems(loc: Location, required: Item[]): Promise<Item[]> {
