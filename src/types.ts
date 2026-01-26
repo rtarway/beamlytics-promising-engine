@@ -20,6 +20,16 @@ export interface Inventory {
   sku: string;
   qty: number;
   safetyStock: number;
+  futureQty?: number;
+  reservedQty?: number;
+  atp?: number;
+  futureDetails?: FutureInventoryDetail[];
+}
+
+export interface FutureInventoryDetail {
+  asnId: string;
+  qty: number;
+  eta: Date;
 }
 
 export interface Location {

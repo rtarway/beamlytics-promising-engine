@@ -1,0 +1,59 @@
+version: '3.8'
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: inventory_future
+    ports:
+      - "5432:5432"
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+  unified-inventory:
+    build: ../unified-inventory-service
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - DATABASE_URL=postgresql://admin:password@postgres:5432/inventory_future
+      - KAFKA_BROKERS=kafka:9092
+    ports:
+      - "3000:3000"
+    depends_on:
+      - redis
+      - postgres
+
+  promising-engine:
+    build: .
+    environment:
+      - INVENTORY_SERVICE_URL=http://unified-inventory:3000
+      - PORT=4000
+    ports:
+      - "4000:4000"
+    depends_on:
+      - unified-inventory
