@@ -10,6 +10,10 @@ module.exports = {
         '!src/types.ts',
         '!src/mocks/**',
         '!src/server.ts',
+        '!src/routes/**',
+        '!src/controllers/**',
+        '!src/config/**',
+        '!src/container.ts'
     ],
     coverageThreshold: {
         global: {

@@ -1,3 +1,5 @@
+# Local development only. For shared machines, set POSTGRES_USER / POSTGRES_PASSWORD
+# in a .env file next to this file (not committed) instead of the defaults below.
 version: '3.8'
 services:
   redis:
@@ -8,9 +10,9 @@ services:
   postgres:
     image: postgres:14
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: inventory_future
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-inventory_future}
     ports:
       - "5432:5432"
 
@@ -40,7 +42,7 @@ services:
     build: ../unified-inventory-service
     environment:
       - REDIS_URL=redis://redis:6379
-      - DATABASE_URL=postgresql://admin:password@postgres:5432/inventory_future
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-password}@postgres:5432/${POSTGRES_DB:-inventory_future}
       - KAFKA_BROKERS=kafka:9092
     ports:
       - "3000:3000"

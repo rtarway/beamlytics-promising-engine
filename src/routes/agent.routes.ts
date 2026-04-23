@@ -1,6 +1,9 @@
 import { Router } from 'express';
+import { ZodError } from 'zod';
 import { ServiceContainer } from '../container';
 import { PromisingAgent } from '../agent/promising-agent';
+import { parseAgentBody } from '../validation/schemas';
+import { clientErrorMessage, logServerError } from '../util/client-error';
 
 const router = Router();
 
@@ -17,20 +20,18 @@ const getAgent = () => {
 
 router.post('/promise', async (req, res) => {
     try {
-        const { order, context } = req.body;
-
-        if (!order || !order.items || !order.destination) {
-            res.status(400).json({ error: 'Invalid order structure' });
-            return;
-        }
-
+        const { order, context } = parseAgentBody(req.body);
         const agentFn = getAgent();
-        const response = await agentFn.determinePromise(order, context || { customerTier: 'REGULAR', urgency: 'LOW' });
+        const response = await agentFn.determinePromise(order, context);
 
         res.json(response);
-    } catch (error: any) {
-        console.error(error);
-        res.status(500).json({ error: error.message });
+    } catch (error: unknown) {
+        if (error instanceof ZodError) {
+            res.status(400).json({ error: 'Invalid request body', details: error.flatten() });
+            return;
+        }
+        logServerError('POST /api/v1/agent/promise', error);
+        res.status(500).json({ error: clientErrorMessage(error) });
     }
 });
 
