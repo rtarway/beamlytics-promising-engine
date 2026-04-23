@@ -102,6 +102,22 @@ services:
 
 For production, apply the following manifests (simplified).
 
+### Promising Engine: required environment
+
+The app reads configuration from the environment. Align these with your cluster’s **Service** DNS names and ports:
+
+| Variable | Purpose |
+|----------|---------|
+| `PORT` | Must match the container port and liveness `httpGet` port (see [k8s/deployment.yaml](../k8s/deployment.yaml), currently `3000`). |
+| `NODE_ENV` | Set to `production` so API errors do not expose internal messages to clients. |
+| `INVENTORY_SERVICE_URL` | Base URL for the unified inventory (or mock) service. |
+| `RATE_SHOPPER_SERVICE_URL` | Base URL for rate shopping. |
+| `RETENTION_SERVICE_URL` | Base URL for retention cost. |
+| `JSON_BODY_LIMIT` | Optional. Max JSON body (default `1mb`). |
+| `RATE_LIMIT_MAX` | Optional. Max API requests per IP per 15 minutes (default `300`). |
+
+Replace placeholder hostnames in the deployment manifest with your real K8s service names, or use `envFrom` with a `ConfigMap` / `Secret` as in the unified-inventory example below.
+
 ### Unified Inventory Deployment
 ```yaml
 apiVersion: apps/v1
