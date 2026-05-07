@@ -33,6 +33,6 @@
     "express-rate-limit": "^8.4.0",
     "haversine-distance": "^1.2.4",
     "helmet": "^8.1.0",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   }
 }
